@@ -202,14 +202,12 @@ func LoadConfig(path string) error {
 			err = fmt.Errorf("failed to unmarshal config: %w", err)
 			return
 		}
-		fmt.Println(v.AllSettings())
 
 		setEnableFromEnv := func(envVar string, config *bool) {
 			if value := os.Getenv(envVar); value != "" {
 				*config = strings.ToLower(value) == "true"
 			}
 		}
-		fmt.Println(cfg.Alert.GoogleChat.WebhookURL)
 		setEnableFromEnv("DEBUG_BODY", &cfg.Alert.DebugBody)
 		setEnableFromEnv("DEBUG_BODY", &cfg.Queue.DebugBody)
 
