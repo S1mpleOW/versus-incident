@@ -31,13 +31,14 @@ type ProxyConfig struct {
 }
 
 type AlertConfig struct {
-	DebugBody bool `mapstructure:"debug_body"`
-	Slack     SlackConfig
-	Telegram  TelegramConfig
-	Viber     ViberConfig
-	Email     EmailConfig
-	MSTeams   MSTeamsConfig
-	Lark      LarkConfig
+	DebugBody  bool `mapstructure:"debug_body"`
+	Slack      SlackConfig
+	Telegram   TelegramConfig
+	Viber      ViberConfig
+	Email      EmailConfig
+	MSTeams    MSTeamsConfig
+	Lark       LarkConfig
+	GoogleChat GoogleChatConfig
 }
 
 type SlackConfig struct {
@@ -94,6 +95,14 @@ type MSTeamsConfig struct {
 }
 
 type LarkConfig struct {
+	Enable           bool
+	WebhookURL       string            `mapstructure:"webhook_url"`
+	TemplatePath     string            `mapstructure:"template_path"`
+	OtherWebhookURLs map[string]string `mapstructure:"other_webhook_urls"`
+	UseProxy         bool              `mapstructure:"use_proxy"`
+}
+
+type GoogleChatConfig struct {
 	Enable           bool
 	WebhookURL       string            `mapstructure:"webhook_url"`
 	TemplatePath     string            `mapstructure:"template_path"`
@@ -193,13 +202,14 @@ func LoadConfig(path string) error {
 			err = fmt.Errorf("failed to unmarshal config: %w", err)
 			return
 		}
+		fmt.Println(v.AllSettings())
 
 		setEnableFromEnv := func(envVar string, config *bool) {
 			if value := os.Getenv(envVar); value != "" {
 				*config = strings.ToLower(value) == "true"
 			}
 		}
-
+		fmt.Println(cfg.Alert.GoogleChat.WebhookURL)
 		setEnableFromEnv("DEBUG_BODY", &cfg.Alert.DebugBody)
 		setEnableFromEnv("DEBUG_BODY", &cfg.Queue.DebugBody)
 
@@ -212,6 +222,9 @@ func LoadConfig(path string) error {
 		setEnableFromEnv("MSTEAMS_ENABLE", &cfg.Alert.MSTeams.Enable)
 		setEnableFromEnv("LARK_ENABLE", &cfg.Alert.Lark.Enable)
 		setEnableFromEnv("LARK_USE_PROXY", &cfg.Alert.Lark.UseProxy)
+		setEnableFromEnv("GOOGLE_CHAT_ENABLE", &cfg.Alert.GoogleChat.Enable)
+		setEnableFromEnv("GOOGLE_CHAT_USE_PROXY", &cfg.Alert.GoogleChat.UseProxy)
+		setEnableFromEnv("SNS_ENABLE", &cfg.Queue.SNS.Enable)
 		setEnableFromEnv("SNS_ENABLE", &cfg.Queue.SNS.Enable)
 
 		setEnableFromEnv("ONCALL_ENABLE", &cfg.OnCall.Enable)
@@ -232,7 +245,7 @@ func GetConfig() *Config {
 	return cfg
 }
 
-func GetConfigWitParamsOverwrite(paramsOverwrite *map[string]string) *Config {
+func GetConfigWithParamsOverwrite(paramsOverwrite *map[string]string) *Config {
 	// Clone the global cfg
 	clonedCfg := cloneConfig(cfg)
 
@@ -276,6 +289,17 @@ func GetConfigWitParamsOverwrite(paramsOverwrite *map[string]string) *Config {
 
 			if webhookURL != "" {
 				clonedCfg.Alert.Lark.WebhookURL = webhookURL
+			}
+		}
+	}
+
+	if v := (*paramsOverwrite)["google_chat_other_webhook_url"]; v != "" {
+		fmt.Println("Using Google Chat webhook URL:", v)
+		if clonedCfg.Alert.GoogleChat.OtherWebhookURLs != nil {
+			webhookURL := clonedCfg.Alert.GoogleChat.OtherWebhookURLs[v]
+
+			if webhookURL != "" {
+				clonedCfg.Alert.GoogleChat.WebhookURL = webhookURL
 			}
 		}
 	}

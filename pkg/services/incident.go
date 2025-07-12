@@ -15,7 +15,7 @@ func CreateIncident(teamID string, content *map[string]interface{}, params ...*m
 	var cfg *config.Config
 
 	if len(params) > 0 {
-		cfg = config.GetConfigWitParamsOverwrite(params[0])
+		cfg = config.GetConfigWithParamsOverwrite(params[0])
 	} else {
 		cfg = config.GetConfig()
 	}

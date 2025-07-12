@@ -24,13 +24,14 @@ func cloneConfig(src *Config) *Config {
 // Helper function to deep clone the AlertConfig struct
 func cloneAlertConfig(src AlertConfig) AlertConfig {
 	return AlertConfig{
-		DebugBody: src.DebugBody,
-		Slack:     cloneSlackConfig(src.Slack),
-		Telegram:  cloneTelegramConfig(src.Telegram),
-		Viber:     cloneViberConfig(src.Viber),
-		Email:     cloneEmailConfig(src.Email),
-		MSTeams:   cloneMSTeamsConfig(src.MSTeams),
-		Lark:      cloneLarkConfig(src.Lark),
+		DebugBody:  src.DebugBody,
+		Slack:      cloneSlackConfig(src.Slack),
+		Telegram:   cloneTelegramConfig(src.Telegram),
+		Viber:      cloneViberConfig(src.Viber),
+		Email:      cloneEmailConfig(src.Email),
+		MSTeams:    cloneMSTeamsConfig(src.MSTeams),
+		Lark:       cloneLarkConfig(src.Lark),
+		GoogleChat: cloneGGChatConfig(src.GoogleChat),
 	}
 }
 
@@ -229,5 +230,28 @@ func cloneRedisConfig(src RedisConfig) RedisConfig {
 		Password:           src.Password,
 		DB:                 src.DB,
 		InsecureSkipVerify: src.InsecureSkipVerify,
+	}
+}
+
+func cloneOtherWebhookURLs(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+
+	// Create a new map and copy the contents
+	cloned := make(map[string]string, len(src))
+	for k, v := range src {
+		cloned[k] = v
+	}
+	return cloned
+}
+
+func cloneGGChatConfig(src GoogleChatConfig) GoogleChatConfig {
+	return GoogleChatConfig{
+		WebhookURL:       src.WebhookURL,
+		TemplatePath:     src.TemplatePath,
+		UseProxy:         src.UseProxy,
+		OtherWebhookURLs: cloneOtherWebhookURLs(src.OtherWebhookURLs),
+		Enable:           src.Enable,
 	}
 }

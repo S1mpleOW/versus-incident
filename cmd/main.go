@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssmincidents"
 	"github.com/go-redis/redis/v8"
+	"github.com/subosito/gotenv"
 
 	"github.com/VersusControl/versus-incident/pkg/common"
 
@@ -24,6 +25,11 @@ import (
 )
 
 func main() {
+	// Load environment variables from .env file
+	if err := gotenv.Load(); err != nil {
+		log.Printf("Warning: Could not load .env file: %v", err)
+	}
+
 	err := c.LoadConfig("config/config.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -32,7 +38,7 @@ func main() {
 	cfg := c.GetConfig()
 
 	app := fiber.New(fiber.Config{
-		DisableStartupMessage: true, // Disable the default Fiber banner
+		DisableStartupMessage: false, // Disable the default Fiber banner
 	})
 
 	app.Use(middleware.Logger())

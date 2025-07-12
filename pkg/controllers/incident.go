@@ -29,8 +29,8 @@ func CreateIncident(c *fiber.Ctx) error {
 
 	// If query parameters exist, get the value to overwrite the default configuration
 	if len(c.Queries()) > 0 {
-		overwriteVaule := c.Queries()
-		err = services.CreateIncident("", body, &overwriteVaule)
+		overwriteValue := c.Queries()
+		err = services.CreateIncident("", body, &overwriteValue)
 	} else {
 		err = services.CreateIncident("", body)
 	}

@@ -1,7 +1,7 @@
 name: versus
 host: 0.0.0.0
 port: 3000
-public_host: https://your-host.example
+public_host: http://localhost:3000 
 
 # Proxy configuration (global settings)
 proxy:
@@ -63,6 +63,15 @@ alert:
     other_webhook_urls: # Optional: Enable overriding the default webhook URL using query parameters, eg /api/incidents?lark_other_webhook_url=dev
       dev: ${LARK_OTHER_WEBHOOK_URL_DEV}
       prod: ${LARK_OTHER_WEBHOOK_URL_PROD}
+
+  googlechat:
+    enable: true # Default value, will be overridden by GOOGLE_CHAT_ENABLE env var
+    webhook_url: ${GOOGLE_CHAT_WEBHOOK_URL} # Google Chat webhook URL (required)
+    template_path: "config/ggchat_message.tmpl"
+    use_proxy: false # Set to true to use global proxy settings for Google Chat API calls
+    other_webhook_urls: # Optional: Enable overriding the default webhook URL using query parameters, eg /api/incidents?google_chat_other_webhook_url=dev
+      dev: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_DEV}
+      prod: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_PROD}
 
 queue:
   enable: true

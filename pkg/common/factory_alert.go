@@ -67,6 +67,15 @@ func (f *AlertProviderFactory) CreateProviders() ([]core.AlertProvider, error) {
 		providers = append(providers, larkProvider)
 	}
 
+	if f.cfg.Alert.GoogleChat.Enable {
+		fmt.Println("Creating Google Chat provider")
+		googleChatProvider, err := f.createGoogleChatProvider()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Google Chat provider: %w", err)
+		}
+		providers = append(providers, googleChatProvider)
+	}
+
 	return providers, nil
 }
 
@@ -171,5 +180,21 @@ func (f *AlertProviderFactory) createLarkProvider() (core.AlertProvider, error) 
 		WebhookURL:   lc.WebhookURL,
 		TemplatePath: lc.TemplatePath,
 		UseProxy:     lc.UseProxy,
+	}, f.cfg.Proxy), nil
+}
+
+func (f *AlertProviderFactory) createGoogleChatProvider() (core.AlertProvider, error) {
+	gc := f.cfg.Alert.GoogleChat
+	fmt.Println("Webhook URL:", gc.WebhookURL)
+	fmt.Println("Template Path:", gc.TemplatePath)
+	// Check that webhook URL and template path are provided
+	if gc.WebhookURL == "" || gc.TemplatePath == "" {
+		return nil, fmt.Errorf("missing required Google Chat configuration: need webhook_url and template_path")
+	}
+
+	return NewGoogleChatProvider(config.GoogleChatConfig{
+		WebhookURL:   gc.WebhookURL,
+		TemplatePath: gc.TemplatePath,
+		UseProxy:     gc.UseProxy,
 	}, f.cfg.Proxy), nil
 }
