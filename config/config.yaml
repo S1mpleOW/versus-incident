@@ -72,6 +72,7 @@ alert:
     other_webhook_urls: # Optional: Enable overriding the default webhook URL using query parameters, eg /api/incidents?google_chat_other_webhook_url=dev
       dev: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_DEV}
       prod: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_PROD}
+      sm_pricing_bitbucket: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_SM_PRICING_BITBUCKET}
 
 queue:
   enable: true

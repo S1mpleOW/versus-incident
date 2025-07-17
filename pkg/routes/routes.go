@@ -16,5 +16,9 @@ func SetupRoutes(app *fiber.App) {
 	incidents := api.Group("/incidents")
 	incidents.Post("/", controllers.CreateIncident)
 
+	notifications := api.Group("/notifications")
+	notifications.Post("/", controllers.CreateNotification)
+	notifications.Post("/bitbucket", controllers.CreateBitbucketNotification)
+
 	api.Get("/ack/:incidentID", controllers.HandleAck)
 }

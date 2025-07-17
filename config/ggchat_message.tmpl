@@ -1,6 +1,6 @@
 {{/*
   Universal Google Chat Alert Template
-  Supports: Alertmanager, Grafana, Sentry, Fluent Bit, CloudWatch
+  Supports: Alertmanager, Grafana, Sentry, Fluent Bit, CloudWatch, Bitbucket
 */}}
 
 {{/* Helper Variables */}}
@@ -8,7 +8,7 @@
 {{- $severityIcons := dict "CRITICAL" "🔴" "ERROR" "🟠" "WARNING" "🟡" "INFO" "ℹ️" "RESOLVED" "✅" -}}
 {{- $statusIcons := dict "FIRING" "🔥" "RESOLVED" "✅" "UNKNOWN" "ℹ️" -}}
 
-{{/* Detect Source System - Same logic as before */}}
+{{/* Detect Source System - Same logic as before plus Bitbucket */}}
 {{- $source := "Unknown" -}}
 {{- if and .receiver -}}
   {{- if or .commonAnnotations.dashboardURL (and .alerts (index .alerts 0).dashboardURL) -}}
@@ -22,6 +22,8 @@
   {{- $source = "Fluent Bit" -}}
 {{- else if or .event.event_id .data.issue.id -}}
   {{- $source = "Sentry" -}}
+{{- else if and .build_key .build_state .build_name -}}
+  {{- $source = "Bitbucket" -}}
 {{- end -}}
 
 {{/* Process Alerts - Same logic as before */}}
@@ -48,7 +50,7 @@
     "RunbookLink" $defaultRunbook
   -}}
 
-  {{/* Map severity based on alert type - Same logic as before */}}
+  {{/* Map severity based on alert type - Same logic as before plus Bitbucket */}}
   {{- $rawSeverity := "" -}}
   {{- if eq $source "Prometheus" -}}
     {{- $rawSeverity = or $alert.labels.severity "info" -}}
@@ -60,6 +62,8 @@
     {{- $rawSeverity = or $alert.level "info" -}}
   {{- else if eq $source "Sentry" -}}
     {{- $rawSeverity = or $alert.data.issue.level $alert.event.level "info" -}}
+  {{- else if eq $source "Bitbucket" -}}
+    {{- $rawSeverity = or $alert.severity "info" -}}
   {{- end -}}
 
   {{- $severity := lower $rawSeverity -}}
@@ -74,7 +78,7 @@
     {{- $mappedSeverity = "RESOLVED" -}}
   {{- end -}}
 
-  {{/* Map status based on alert type - Same logic as before */}}
+  {{/* Map status based on alert type - Same logic as before plus Bitbucket */}}
   {{- $rawStatus := "" -}}
   {{- if eq $source "Prometheus" -}}
     {{- $rawStatus = or $alert.status "unknown" -}}
@@ -86,13 +90,15 @@
     {{- $rawStatus = or $alert.level "unknown" -}}
   {{- else if eq $source "Sentry" -}}
     {{- $rawStatus = or $alert.action "unknown" -}}
+  {{- else if eq $source "Bitbucket" -}}
+    {{- $rawStatus = or $alert.build_state "unknown" -}}
   {{- end -}}
 
   {{- $status := lower $rawStatus -}}
   {{- $mappedStatus := "UNKNOWN" -}}
-  {{- if or (eq $status "firing") (eq $status "alarm") (eq $status "active") (eq $status "unresolved") (eq $status "created") (eq $status "triggered") -}}
+  {{- if or (eq $status "firing") (eq $status "alarm") (eq $status "active") (eq $status "unresolved") (eq $status "created") (eq $status "triggered") (eq $status "failed") (eq $status "stopped") (eq $status "inprogress") -}}
     {{- $mappedStatus = "FIRING" -}}
-  {{- else if or (eq $status "resolved") (eq $status "ok") (eq $status "completed") -}}
+  {{- else if or (eq $status "resolved") (eq $status "ok") (eq $status "completed") (eq $status "successful") -}}
     {{- $mappedStatus = "RESOLVED" -}}
   {{- end -}}
 
@@ -242,6 +248,42 @@
       "DiagnosticLink" (or $alert.data.issue.web_url $alert.url "")
       "RunbookLink" $defaultRunbook
     -}}
+  {{- else if eq $source "Bitbucket" -}}
+    {{- $buildStateIcon := "🔧" -}}
+    {{- if eq $alert.build_state "SUCCESSFUL" -}}
+      {{- $buildStateIcon = "✅" -}}
+    {{- else if eq $alert.build_state "FAILED" -}}
+      {{- $buildStateIcon = "❌" -}}
+    {{- else if eq $alert.build_state "INPROGRESS" -}}
+      {{- $buildStateIcon = "⏳" -}}
+    {{- else if eq $alert.build_state "STOPPED" -}}
+      {{- $buildStateIcon = "⏹️" -}}
+    {{- end -}}
+    {{- $buildTitle := printf "%s %s - %s" $buildStateIcon (or $alert.build_name "Bitbucket Build") (or $alert.build_state "Unknown") -}}
+    {{- $buildResource := printf "Build #%s" (or $alert.build_key "unknown") -}}
+    {{- $buildTimestamp := "" -}}
+    {{- if $alert.timestamp -}}
+      {{- $buildTimestamp = printf "%d" $alert.timestamp | toString -}}
+    {{- else -}}
+      {{- $buildTimestamp = now | format "2006-01-02 15:04:05" -}}
+    {{- end -}}
+    {{- $unified = dict
+      "SourceSystem" $source
+      "Severity" $mappedSeverity
+      "Status" $mappedStatus
+      "Title" $buildTitle
+      "Resource" $buildResource
+      "Description" (or $alert.description "No description provided.")
+      "Timestamp" $buildTimestamp
+      "DiagnosticLink" (or $alert.build_url "")
+      "RunbookLink" $defaultRunbook
+      "BuildDetails" (dict
+        "BuildKey" (or $alert.build_key "")
+        "BuildName" (or $alert.build_name "")
+        "BuildState" (or $alert.build_state "")
+        "BuildURL" (or $alert.build_url "")
+      )
+    -}}
   {{- end -}}
 
   {{- $severityIcon := or (index $severityIcons $unified.Severity) "ℹ️" -}}
@@ -310,12 +352,32 @@
             {{- end -}}
             {{- end -}}
             {{- end -}}
+            {{- if and (eq $unified.SourceSystem "Bitbucket") $unified.BuildDetails -}},
+            {
+              "textParagraph": {
+                "text": "<b>Build Details:</b>"
+              }
+            }
+            {{- if $unified.BuildDetails.BuildKey -}},
+            { "textParagraph": { "text": " • Build Number: {{ $unified.BuildDetails.BuildKey | js }}" } }
+            {{- end -}}
+            {{- if $unified.BuildDetails.BuildName -}},
+            { "textParagraph": { "text": " • Pipeline: {{ $unified.BuildDetails.BuildName | js }}" } }
+            {{- end -}}
+            {{- if $unified.BuildDetails.BuildState -}},
+            { "textParagraph": { "text": " • Status: {{ $unified.BuildDetails.BuildState | js }}" } }
+            {{- end -}}
+            {{- end -}}
             {{- $buttons := list -}}
             {{- if $unified.RunbookLink -}}
               {{- $buttons = append $buttons (dict "text" "Runbook" "onClick" (dict "openLink" (dict "url" $unified.RunbookLink))) -}}
             {{- end -}}
             {{- if $unified.DiagnosticLink -}}
-              {{- $buttons = append $buttons (dict "text" "Diagnostics" "onClick" (dict "openLink" (dict "url" $unified.DiagnosticLink))) -}}
+              {{- $diagnosticText := "Diagnostics" -}}
+              {{- if eq $unified.SourceSystem "Bitbucket" -}}
+                {{- $diagnosticText = "View Build" -}}
+              {{- end -}}
+              {{- $buttons = append $buttons (dict "text" $diagnosticText "onClick" (dict "openLink" (dict "url" $unified.DiagnosticLink))) -}}
             {{- end -}}
             {{- if $alert.AckURL -}}
               {{- $buttons = append $buttons (dict "text" "Acknowledge" "onClick" (dict "openLink" (dict "url" $alert.AckURL))) -}}

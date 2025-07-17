@@ -111,6 +111,7 @@ V       V   EEEEE   RRRRR   SSSSS   U       U   SSSSS
 └───────────────────────────────────────────────────┘
 
 /api/incidents -> receive incident data
+/api/notifications/bitbucket -> receive Bitbucket pipeline notifications
 /api%s       -> receive alerts from AWS SNS
 /api/ack       -> acknowledge on-call alerts
 `, cfg.Host, cfg.Port, cfg.Queue.SNS.EndpointPath)
