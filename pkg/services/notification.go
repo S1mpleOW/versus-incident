@@ -62,6 +62,9 @@ func handleBitbucketNotification(cfg *config.Config, payload *map[string]interfa
 	}
 
 	// Create notification message based on build state
+	utc7Location := time.FixedZone("UTC+7", 7*60*60) // UTC+7 timezone
+	formattedTime := time.Now().In(utc7Location).Format("2006-01-02 15:04:05")
+
 	notificationData := map[string]interface{}{
 		"title":       fmt.Sprintf("Bitbucket Build %s", capitalizeState(bitbucketPayload.State)),
 		"description": bitbucketPayload.Description,
@@ -70,7 +73,7 @@ func handleBitbucketNotification(cfg *config.Config, payload *map[string]interfa
 		"build_state": bitbucketPayload.State,
 		"build_url":   bitbucketPayload.URL,
 		"severity":    determineSeverity(bitbucketPayload.State),
-		"timestamp":   time.Now().Unix(),
+		"timestamp":   formattedTime,
 	}
 
 	// Create incident for the notification
