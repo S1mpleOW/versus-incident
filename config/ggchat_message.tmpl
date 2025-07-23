@@ -20,7 +20,7 @@
   {{- $source = "CloudWatch" -}}
 {{- else if or .log .kubernetes.pod_name -}}
   {{- $source = "Fluent Bit" -}}
-{{- else if or .event.event_id .data.issue.id -}}
+{{- else if or .event.event_id .data.issue.id .data.metric_alert.id -}}
   {{- $source = "Sentry" -}}
 {{- else if and .build_key .build_state .build_name -}}
   {{- $source = "Bitbucket" -}}
@@ -61,7 +61,7 @@
   {{- else if eq $source "Fluent Bit" -}}
     {{- $rawSeverity = or $alert.level "info" -}}
   {{- else if eq $source "Sentry" -}}
-    {{- $rawSeverity = or $alert.data.issue.level $alert.event.level "info" -}}
+    {{- $rawSeverity = or $alert.data.issue.level $alert.event.level $alert.action "info" -}}
   {{- else if eq $source "Bitbucket" -}}
     {{- $rawSeverity = or $alert.severity "info" -}}
   {{- end -}}
@@ -89,14 +89,14 @@
   {{- else if eq $source "Fluent Bit" -}}
     {{- $rawStatus = or $alert.level "unknown" -}}
   {{- else if eq $source "Sentry" -}}
-    {{- $rawStatus = or $alert.action "unknown" -}}
+    {{- $rawStatus = or $alert.action $alert.data.metric_alert.status "unknown" -}}
   {{- else if eq $source "Bitbucket" -}}
     {{- $rawStatus = or $alert.build_state "unknown" -}}
   {{- end -}}
 
   {{- $status := lower $rawStatus -}}
   {{- $mappedStatus := "UNKNOWN" -}}
-  {{- if or (eq $status "firing") (eq $status "alarm") (eq $status "active") (eq $status "unresolved") (eq $status "created") (eq $status "triggered") (eq $status "failed") (eq $status "stopped") (eq $status "inprogress") -}}
+  {{- if or (eq $status "firing") (eq $status "alarm") (eq $status "active") (eq $status "unresolved") (eq $status "created") (eq $status "triggered") (eq $status "failed") (eq $status "stopped") (eq $status "inprogress") (eq $status "critical") (eq $status "warning") -}}
     {{- $mappedStatus = "FIRING" -}}
   {{- else if or (eq $status "resolved") (eq $status "ok") (eq $status "completed") (eq $status "successful") -}}
     {{- $mappedStatus = "RESOLVED" -}}
@@ -237,16 +237,69 @@
   	   )
   	 -}}
   {{- else if eq $source "Sentry" -}}
+    {{- $sentryTitle := "" -}}
+    {{- $sentryResource := "" -}}
+    {{- $sentryDescription := "" -}}
+    {{- $sentryTimestamp := "" -}}
+    {{- $sentryURL := "" -}}
+    
+    {{/* Handle metric alert format */}}
+    {{- if $alert.data.metric_alert -}}
+      {{- $sentryTitle = or $alert.data.metric_alert.title $alert.data.description_title "Sentry Metric Alert" -}}
+      {{- $projects := "" -}}
+      {{- if $alert.data.metric_alert.projects -}}
+        {{- $projectStrings := list -}}
+        {{- range $i, $project := $alert.data.metric_alert.projects -}}
+          {{- if eq $i 0 -}}
+            {{- $projects = printf "%s" $project -}}
+          {{- else -}}
+            {{- $projects = printf "%s, %s" $projects $project -}}
+          {{- end -}}
+        {{- end -}}
+      {{- else if $alert.data.metric_alert.alert_rule.projects -}}
+        {{- range $i, $project := $alert.data.metric_alert.alert_rule.projects -}}
+          {{- if eq $i 0 -}}
+            {{- $projects = printf "%s" $project -}}
+          {{- else -}}
+            {{- $projects = printf "%s, %s" $projects $project -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $sentryResource = printf "Project(s): %s" (or $projects "unknown") -}}
+      {{- $sentryDescription = or $alert.data.description_text "No description provided." -}}
+      {{- $sentryTimestamp = or $alert.data.metric_alert.date_detected $alert.data.metric_alert.date_created (now | format "2006-01-02 15:04:05") -}}
+      {{- $sentryURL = or $alert.data.web_url "" -}}
+    {{/* Handle legacy issue format */}}
+    {{- else -}}
+      {{- $sentryTitle = or $alert.data.issue.title $alert.message $alert.event.title "Sentry Alert" -}}
+      {{- $sentryResource = printf "%s/%s" (or $alert.project_slug "unknown") (or $alert.data.issue.culprit $alert.culprit "N/A") -}}
+      {{- $sentryDescription = or $alert.data.issue.metadata.value $alert.event.logentry.formatted "No description." -}}
+      {{- $sentryTimestamp = or $alert.data.issue.firstSeen $alert.event.timestamp (now | format "2006-01-02 15:04:05") -}}
+      {{- $sentryURL = or $alert.data.issue.web_url $alert.url "" -}}
+    {{- end -}}
+    
+    {{- $alertType := "Issue Alert" -}}
+    {{- if $alert.data.metric_alert -}}
+      {{- $alertType = "Metric Alert" -}}
+    {{- end -}}
+    
     {{- $unified = dict
       "SourceSystem" $source
       "Severity" $mappedSeverity
       "Status" $mappedStatus
-      "Title" (or $alert.data.issue.title $alert.message $alert.event.title "Sentry Alert")
-      "Resource" (printf "%s/%s" (or $alert.project_slug "unknown") (or $alert.data.issue.culprit $alert.culprit "N/A"))
-      "Description" (or $alert.data.issue.metadata.value $alert.event.logentry.formatted "No description.")
-      "Timestamp" (or $alert.data.issue.firstSeen $alert.event.timestamp (now | format "2006-01-02 15:04:05"))
-      "DiagnosticLink" (or $alert.data.issue.web_url $alert.url "")
+      "Title" $sentryTitle
+      "Resource" $sentryResource
+      "Description" $sentryDescription
+      "Timestamp" $sentryTimestamp
+      "DiagnosticLink" $sentryURL
       "RunbookLink" $defaultRunbook
+      "SentryDetails" (dict
+        "AlertType" $alertType
+        "Environment" (or $alert.data.metric_alert.alert_rule.environment "")
+        "Dataset" (or $alert.data.metric_alert.alert_rule.dataset "")
+        "Query" (or $alert.data.metric_alert.alert_rule.query "")
+        "Aggregate" (or $alert.data.metric_alert.alert_rule.aggregate "")
+      )
     -}}
   {{- else if eq $source "Bitbucket" -}}
     {{- $buildStateIcon := "🔧" -}}
@@ -368,6 +421,25 @@
             { "textParagraph": { "text": " • Status: {{ $unified.BuildDetails.BuildState | js }}" } }
             {{- end -}}
             {{- end -}}
+            {{- if and (eq $unified.SourceSystem "Sentry") $unified.SentryDetails -}},
+            {
+              "textParagraph": {
+                "text": "<b>Sentry Details:</b>"
+              }
+            }
+            {{- if $unified.SentryDetails.AlertType -}},
+            { "textParagraph": { "text": " • Alert Type: {{ $unified.SentryDetails.AlertType | js }}" } }
+            {{- end -}}
+            {{- if $unified.SentryDetails.Environment -}},
+            { "textParagraph": { "text": " • Environment: {{ $unified.SentryDetails.Environment | js }}" } }
+            {{- end -}}
+            {{- if $unified.SentryDetails.Dataset -}},
+            { "textParagraph": { "text": " • Dataset: {{ $unified.SentryDetails.Dataset | js }}" } }
+            {{- end -}}
+            {{- if $unified.SentryDetails.Aggregate -}},
+            { "textParagraph": { "text": " • Metric: {{ $unified.SentryDetails.Aggregate | js }}" } }
+            {{- end -}}
+            {{- end -}}
             {{- $buttons := list -}}
             {{- if $unified.RunbookLink -}}
               {{- $buttons = append $buttons (dict "text" "Runbook" "onClick" (dict "openLink" (dict "url" $unified.RunbookLink))) -}}
@@ -376,6 +448,8 @@
               {{- $diagnosticText := "Diagnostics" -}}
               {{- if eq $unified.SourceSystem "Bitbucket" -}}
                 {{- $diagnosticText = "View Build" -}}
+              {{- else if eq $unified.SourceSystem "Sentry" -}}
+                {{- $diagnosticText = "View in Sentry" -}}
               {{- end -}}
               {{- $buttons = append $buttons (dict "text" $diagnosticText "onClick" (dict "openLink" (dict "url" $unified.DiagnosticLink))) -}}
             {{- end -}}
