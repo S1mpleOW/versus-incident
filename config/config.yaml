@@ -74,6 +74,7 @@ alert:
       prod: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_PROD}
       de_sm_pricing_bitbucket: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_DE_SM_PRICING_BITBUCKET}
       ds_sm_pricing_bitbucket: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_DS_SM_PRICING_BITBUCKET}
+      radar_sentry: ${GOOGLE_CHAT_OTHER_WEBHOOK_URL_RADAR_SENTRY}
 
 queue:
   enable: true
